@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-// Removed StoredMessage from this import
+// Removed StoredMessage as it's not used here and caused a previous error
 import type { ChatServiceResponse, ChatServiceRequest } from '@/types';
 import type { User } from '@supabase/supabase-js';
 // Removed unused import: import { json } from 'stream/consumers';
@@ -12,7 +12,7 @@ const supabaseServiceRoleKey: string | undefined = process.env.SUPABASE_SERVICE_
 const openAIApiKey: string | undefined = process.env.OPENAI_API_KEY;
 const assistantId: string | undefined = process.env.OPENAI_ASSISTANT_ID;
 
-if (!supabaseUrl || !supabaseServiceRoleKey || !openAIApiKey || !assistantId) {
+if (!supabaseUrl || !supabaseServiceRoleKey || !openAIApiKey || !assistantId) { // This check is vital
   console.error("CRITICAL: One or more environment variables are missing for /api/chat. App may not function.");
   throw new Error("Server configuration error: Missing critical environment variables for chat API.");
 }
@@ -79,11 +79,13 @@ export default async function handler(
     }
 
     let currentOpenAIThreadId = existingOpenAIThreadId;
-    let currentConversationDbId: number | string | null | undefined = existingConversationDbId; // Adjusted type to include string as per previous fixes
+    // Ensure this type aligns with your ChatServiceRequest and ChatServiceResponse types for conversation_db_id
+    let currentConversationDbId: number | string | null | undefined = existingConversationDbId;
+
 
     // 3. Manage OpenAI Thread & Supabase Conversation Record
-    if (!currentOpenAIThreadId && typeof currentConversationDbId !== 'number' && typeof currentConversationDbId !== 'string') { // Check if DB ID is also not set
-      // New conversation both in OpenAI and our DB
+    // Check if both OpenAI thread ID and our DB conversation ID are missing to determine a new conversation
+    if (!currentOpenAIThreadId && (currentConversationDbId === null || currentConversationDbId === undefined)) {
       console.log(`Chat API - User ${authenticatedUser.id}: Creating new OpenAI thread and DB conversation.`);
       const thread = await openai.beta.threads.create();
       currentOpenAIThreadId = thread.id;
@@ -101,7 +103,7 @@ export default async function handler(
         console.error('Chat API - DB Error creating conversation:', convInsertError.message);
         throw convInsertError;
       }
-      currentConversationDbId = newConversation!.id; // id from Supabase is typically number or string (UUID)
+      currentConversationDbId = newConversation!.id;
       console.log(`Chat API - User ${authenticatedUser.id}: New DB conversation ID ${currentConversationDbId} linked to OpenAI Thread ${currentOpenAIThreadId}`);
     } else if (currentOpenAIThreadId && (typeof currentConversationDbId === 'number' || typeof currentConversationDbId === 'string')) {
       // Existing conversation, update timestamp
@@ -109,12 +111,11 @@ export default async function handler(
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', currentConversationDbId)
-        .eq('user_id', authenticatedUser.id); // Ensure user owns this
+        .eq('user_id', authenticatedUser.id);
     } else {
         console.error(`Chat API - User ${authenticatedUser.id}: Inconsistent state - OpenAI Thread ID: ${currentOpenAIThreadId}, DB Conversation ID: ${currentConversationDbId}`);
         return res.status(400).json({ error: "Inconsistent conversation state. Please start a new chat." });
     }
-
 
     // 4. Add User Message to OpenAI Thread
     await openai.beta.threads.messages.create(currentOpenAIThreadId!, {
@@ -130,10 +131,9 @@ export default async function handler(
         console.error('Chat API - DB Error saving user message:', userMsgInsertError.message);
     }
 
-
     // 6. Create and Run Assistant
     let run = await openai.beta.threads.runs.create(currentOpenAIThreadId!, {
-      assistant_id: assistantId,
+      assistant_id: assistantId!, // <--- FIX APPLIED HERE: Non-null assertion
     });
 
     // 7. Poll for Run Completion & Handle Tool Calls
@@ -188,7 +188,7 @@ export default async function handler(
     const messagesResponse = await openai.beta.threads.messages.list(currentOpenAIThreadId!, { order: 'desc', limit: 1 });
     
     let assistantReply = "I'm not quite sure how to respond to that at the moment. Could you try rephrasing or asking something else?";
-    // @ts-ignore // OpenAI type for content can be complex array, this simplifies for text
+    // @ts-ignore // OpenAI type for content can be complex array, this simplifies for text content
     if (messagesResponse.data.length > 0 && messagesResponse.data[0].role === 'assistant' && messagesResponse.data[0].content[0]?.type === 'text') {
         // @ts-ignore
         assistantReply = messagesResponse.data[0].content[0].text.value;
@@ -203,11 +203,11 @@ export default async function handler(
     }
 
     // 10. Send Response to Frontend
+    // Ensure the structure here matches your `ChatServiceResponse` type from `@/types`
     return res.status(200).json({
-      // Ensure properties match ChatServiceResponse type from '@/types'
-      reply: assistantReply, // Assuming this maps to 'result' or similar in ChatServiceResponse
+      reply: assistantReply, // Or 'result' if that's what ChatServiceResponse expects
       openai_thread_id: currentOpenAIThreadId!,
-      conversation_db_id: currentConversationDbId!, // Ensure this type (number/string) matches ChatServiceResponse
+      conversation_db_id: currentConversationDbId!, // Ensure type (number/string) matches ChatServiceResponse
       explanation: "Response from AI Companion."
     });
 
