@@ -1,35 +1,42 @@
-import React, { useState, useEffect } from 'react'; // Added useEffect
+// Potentially more robust NavBar.tsx
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/router'; // Keep the import
 import { useAuth } from '@/components/AuthProvider';
-// Assuming UserIcon is not used in this version, if it is, ensure it's imported and used correctly.
-// import UserIcon from '@/components/icons/UserIcon';
 import HamburgerMenuIcon from '@/components/icons/HamburgerMenu';
 
 const NavBar: React.FC = () => {
   const { user, loading, signOut } = useAuth();
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [currentPath, setCurrentPath] = useState(''); // State to hold the path client-side
+  const [currentPath, setCurrentPath] = useState('');
+  const router = useRouter(); // Call it, but be careful with direct usage for rendering
 
   useEffect(() => {
-    // Set the current path once the router is ready on the client-side
+    // router.pathname is available reliably on the client side after mount
     if (router.isReady) {
       setCurrentPath(router.pathname);
     }
-  }, [router.isReady, router.pathname]); // Update when router becomes ready or path changes
+  }, [router.isReady, router.pathname]);
 
   const handleSignOut = async () => {
-    setIsOpen(false); // Close menu on sign out
+    setIsOpen(false);
     await signOut();
-    router.push('/login'); // router.push is fine here as it's a user interaction
+    if (router.isReady) { // Check before push
+        router.push('/login');
+    }
   };
 
-  // Helper function for active link styling
   const getLinkClassName = (path: string, baseStyle: string, activeStyle: string) => {
-    return `${baseStyle} ${currentPath === path ? activeStyle : ''}`;
+    // Only apply active style if currentPath is set (i.e., client-side and router ready)
+    return `${baseStyle} ${currentPath && currentPath === path ? activeStyle : ''}`;
   };
 
+  // ... (rest of your NavBar JSX using getLinkClassName) ...
+  // The JSX structure you had before should be mostly fine with this getLinkClassName logic.
+  // The key is that getLinkClassName won't try to apply active styles server-side.
+
+  // Ensure no direct usage of router.pathname in JSX classNames outside of getLinkClassName
+  // or other similar client-side guarded logic.
   return (
     <nav className="w-full bg-white shadow-sm fixed top-0 z-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,7 +55,7 @@ const NavBar: React.FC = () => {
                   <a className={getLinkClassName(
                     '/login',
                     'text-sm font-medium px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-                    'bg-blue-700 text-white' // Active style for login (can be same as base if always highlighted)
+                    'bg-blue-700 text-white' 
                   )}>
                     Login
                   </a>
@@ -57,7 +64,7 @@ const NavBar: React.FC = () => {
                   <a className={getLinkClassName(
                     '/signup',
                     'text-sm font-medium px-3 py-2 rounded-md border border-blue-600 text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-                    'border-blue-700 text-blue-700 bg-blue-50' // Active style for signup
+                    'border-blue-700 text-blue-700 bg-blue-50' 
                   )}>
                     Sign Up
                   </a>
@@ -77,88 +84,19 @@ const NavBar: React.FC = () => {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {user && !loading ? (
               <>
-                <Link href="/profile" legacyBehavior>
-                  <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                    '/profile',
-                    'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                    'text-blue-700 bg-blue-50'
-                  )}>
-                    Profile
-                  </a>
-                </Link>
-                <Link href="/past-conversations" legacyBehavior>
-                  <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                    '/past-conversations',
-                    'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                    'text-blue-700 bg-blue-50'
-                  )}>
-                    History
-                  </a>
-                </Link>
-                <Link href="/about-us" legacyBehavior>
-                  <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                    '/about-us',
-                    'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                    'text-blue-700 bg-blue-50'
-                  )}>
-                    About Us
-                  </a>
-                </Link>
-                <Link href="/faq" legacyBehavior>
-                  <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                    '/faq',
-                    'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                    'text-blue-700 bg-blue-50'
-                  )}>
-                    FAQ
-                  </a>
-                </Link>
-                <Link href="/contact" legacyBehavior>
-                  <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                    '/contact',
-                    'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                    'text-blue-700 bg-blue-50'
-                  )}>
-                    Contact Us
-                  </a>
-                </Link>
-                <button
-                  onClick={handleSignOut} // setIsOpen(false) is now in handleSignOut
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50 hover:text-red-700"
-                >
-                  Sign Out
-                </button>
+                <Link href="/profile" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/profile', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>Profile</a></Link>
+                <Link href="/past-conversations" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/past-conversations', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>History</a></Link>
+                <Link href="/about-us" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/about-us', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>About Us</a></Link>
+                <Link href="/faq" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/faq', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>FAQ</a></Link>
+                <Link href="/contact" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/contact', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>Contact Us</a></Link>
+                <button onClick={handleSignOut} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-50 hover:text-red-700">Sign Out</button>
               </>
             ) : (
               !loading && (
                 <>
-                  <Link href="/about-us" legacyBehavior>
-                    <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                      '/about-us',
-                      'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                      'text-blue-700 bg-blue-50'
-                    )}>
-                      About Us
-                    </a>
-                  </Link>
-                  <Link href="/faq" legacyBehavior>
-                    <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                      '/faq',
-                      'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                      'text-blue-700 bg-blue-50'
-                    )}>
-                      FAQ
-                    </a>
-                  </Link>
-                  <Link href="/contact" legacyBehavior>
-                    <a onClick={() => setIsOpen(false)} className={getLinkClassName(
-                      '/contact',
-                      'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900',
-                      'text-blue-700 bg-blue-50'
-                    )}>
-                      Contact Us
-                    </a>
-                  </Link>
+                  <Link href="/about-us" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/about-us', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>About Us</a></Link>
+                  <Link href="/faq" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/faq', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>FAQ</a></Link>
+                  <Link href="/contact" legacyBehavior><a onClick={() => setIsOpen(false)} className={getLinkClassName('/contact', 'block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 hover:text-gray-900', 'text-blue-700 bg-blue-50')}>Contact Us</a></Link>
                 </>
               )
             )}
@@ -168,5 +106,4 @@ const NavBar: React.FC = () => {
     </nav>
   );
 };
-
 export default NavBar;
