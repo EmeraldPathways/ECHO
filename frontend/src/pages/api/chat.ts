@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { ChatServiceResponse, ChatServiceRequest, StoredMessage } from '@/types';
+// Removed StoredMessage from this import
+import type { ChatServiceResponse, ChatServiceRequest } from '@/types';
 import type { User } from '@supabase/supabase-js';
-import { json } from 'stream/consumers'; // Not typically needed here, ensure it's not a typo
+// Removed unused import: import { json } from 'stream/consumers';
 
 // --- Environment Variables ---
 const supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -78,10 +79,10 @@ export default async function handler(
     }
 
     let currentOpenAIThreadId = existingOpenAIThreadId;
-    let currentConversationDbId: number | null | undefined = existingConversationDbId;
+    let currentConversationDbId: number | string | null | undefined = existingConversationDbId; // Adjusted type to include string as per previous fixes
 
     // 3. Manage OpenAI Thread & Supabase Conversation Record
-    if (!currentOpenAIThreadId && !currentConversationDbId) {
+    if (!currentOpenAIThreadId && typeof currentConversationDbId !== 'number' && typeof currentConversationDbId !== 'string') { // Check if DB ID is also not set
       // New conversation both in OpenAI and our DB
       console.log(`Chat API - User ${authenticatedUser.id}: Creating new OpenAI thread and DB conversation.`);
       const thread = await openai.beta.threads.create();
@@ -100,9 +101,9 @@ export default async function handler(
         console.error('Chat API - DB Error creating conversation:', convInsertError.message);
         throw convInsertError;
       }
-      currentConversationDbId = newConversation!.id;
+      currentConversationDbId = newConversation!.id; // id from Supabase is typically number or string (UUID)
       console.log(`Chat API - User ${authenticatedUser.id}: New DB conversation ID ${currentConversationDbId} linked to OpenAI Thread ${currentOpenAIThreadId}`);
-    } else if (currentOpenAIThreadId && currentConversationDbId) {
+    } else if (currentOpenAIThreadId && (typeof currentConversationDbId === 'number' || typeof currentConversationDbId === 'string')) {
       // Existing conversation, update timestamp
       await supabaseAdmin
         .from('conversations')
@@ -110,42 +111,34 @@ export default async function handler(
         .eq('id', currentConversationDbId)
         .eq('user_id', authenticatedUser.id); // Ensure user owns this
     } else {
-        // This case (one ID present but not the other) might indicate an inconsistent state.
-        // For robustness, you might decide to create a new thread/conversation or return an error.
         console.error(`Chat API - User ${authenticatedUser.id}: Inconsistent state - OpenAI Thread ID: ${currentOpenAIThreadId}, DB Conversation ID: ${currentConversationDbId}`);
         return res.status(400).json({ error: "Inconsistent conversation state. Please start a new chat." });
     }
 
 
     // 4. Add User Message to OpenAI Thread
-    await openai.beta.threads.messages.create(currentOpenAIThreadId!, { // Assert currentOpenAIThreadId is not null
+    await openai.beta.threads.messages.create(currentOpenAIThreadId!, {
       role: 'user',
       content: userMessageContent,
     });
 
     // 5. Save User Message to Supabase DB
-    // It's good practice to save the user message before waiting for the AI,
-    // so it's recorded even if the AI call fails.
     const { error: userMsgInsertError } = await supabaseAdmin.from('messages').insert([
       { conversation_id: currentConversationDbId, role: 'user', content: userMessageContent },
     ]);
     if (userMsgInsertError) {
         console.error('Chat API - DB Error saving user message:', userMsgInsertError.message);
-        // Decide if this is a critical failure or if you can proceed
     }
 
 
     // 6. Create and Run Assistant
-    let run = await openai.beta.threads.runs.create(currentOpenAIThreadId!, { // Assert non-null
+    let run = await openai.beta.threads.runs.create(currentOpenAIThreadId!, {
       assistant_id: assistantId,
-      // Instructions are set on the Assistant object in OpenAI dashboard.
-      // You can override or add metadata here if needed:
-      // metadata: { user_db_id: authenticatedUser.id, conversation_db_id: currentConversationDbId }
     });
 
     // 7. Poll for Run Completion & Handle Tool Calls
-    const maxPollAttempts = 35; // ~70 seconds
-    const pollInterval = 2000; 
+    const maxPollAttempts = 35;
+    const pollInterval = 2000;
 
     for (let attempt = 0; attempt < maxPollAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
@@ -192,14 +185,14 @@ export default async function handler(
     }
 
     // 8. Retrieve Assistant's Response
-    const messagesResponse = await openai.beta.threads.messages.list(currentOpenAIThreadId!, { order: 'desc', limit: 1 }); // Get only the latest
+    const messagesResponse = await openai.beta.threads.messages.list(currentOpenAIThreadId!, { order: 'desc', limit: 1 });
     
     let assistantReply = "I'm not quite sure how to respond to that at the moment. Could you try rephrasing or asking something else?";
+    // @ts-ignore // OpenAI type for content can be complex array, this simplifies for text
     if (messagesResponse.data.length > 0 && messagesResponse.data[0].role === 'assistant' && messagesResponse.data[0].content[0]?.type === 'text') {
         // @ts-ignore
         assistantReply = messagesResponse.data[0].content[0].text.value;
     }
-
 
     // 9. Save Assistant Message to Supabase DB
     const { error: assistantMsgInsertError } = await supabaseAdmin.from('messages').insert([
@@ -207,15 +200,15 @@ export default async function handler(
     ]);
     if (assistantMsgInsertError) {
         console.error('Chat API - DB Error saving assistant message:', assistantMsgInsertError.message);
-        // Decide how to handle this; the user has the reply, but it's not saved.
     }
 
     // 10. Send Response to Frontend
     return res.status(200).json({
-      reply: assistantReply,
-      openai_thread_id: currentOpenAIThreadId!, // Assert non-null
-      conversation_db_id: currentConversationDbId!, // Assert non-null
-      explanation: "Response from AI Companion." 
+      // Ensure properties match ChatServiceResponse type from '@/types'
+      reply: assistantReply, // Assuming this maps to 'result' or similar in ChatServiceResponse
+      openai_thread_id: currentOpenAIThreadId!,
+      conversation_db_id: currentConversationDbId!, // Ensure this type (number/string) matches ChatServiceResponse
+      explanation: "Response from AI Companion."
     });
 
   } catch (error: any) {
