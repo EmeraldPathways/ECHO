@@ -1,10 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-// Removed StoredMessage as it's not used here and caused a previous error
 import type { ChatServiceResponse, ChatServiceRequest } from '@/types';
 import type { User } from '@supabase/supabase-js';
-// Removed unused import: import { json } from 'stream/consumers';
 
 // --- Environment Variables ---
 const supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -12,7 +10,7 @@ const supabaseServiceRoleKey: string | undefined = process.env.SUPABASE_SERVICE_
 const openAIApiKey: string | undefined = process.env.OPENAI_API_KEY;
 const assistantId: string | undefined = process.env.OPENAI_ASSISTANT_ID;
 
-if (!supabaseUrl || !supabaseServiceRoleKey || !openAIApiKey || !assistantId) { // This check is vital
+if (!supabaseUrl || !supabaseServiceRoleKey || !openAIApiKey || !assistantId) {
   console.error("CRITICAL: One or more environment variables are missing for /api/chat. App may not function.");
   throw new Error("Server configuration error: Missing critical environment variables for chat API.");
 }
@@ -31,7 +29,6 @@ const TRUSTED_KNOWLEDGE_BASE = {
         "definition": "Mindfulness is a type of meditation in which you focus on being intensely aware of what you're seeing and feeling in the moment, without interpretation or judgment.",
         "general_note": "Practicing mindfulness involves breathing methods, guided imagery, and other practices to relax the body and mind and help reduce stress. Many people explore mindfulness as a way to become more aware of their thoughts and feelings."
     }
-    // Add more topics...
 };
 
 async function execute_get_general_information_on_topic(topic: string): Promise<string> {
@@ -57,7 +54,6 @@ export default async function handler(
 
   let authenticatedUser: User | null = null;
   try {
-    // 1. Authenticate User
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Authorization header missing or malformed' });
@@ -71,7 +67,6 @@ export default async function handler(
     }
     authenticatedUser = authData.user;
 
-    // 2. Get User Input
     const { text: userMessageContent, thread_id: existingOpenAIThreadId, conversation_db_id: existingConversationDbId } = req.body as ChatServiceRequest;
 
     if (!userMessageContent || typeof userMessageContent !== 'string' || userMessageContent.trim() === "") {
@@ -79,12 +74,8 @@ export default async function handler(
     }
 
     let currentOpenAIThreadId = existingOpenAIThreadId;
-    // Ensure this type aligns with your ChatServiceRequest and ChatServiceResponse types for conversation_db_id
     let currentConversationDbId: number | string | null | undefined = existingConversationDbId;
 
-
-    // 3. Manage OpenAI Thread & Supabase Conversation Record
-    // Check if both OpenAI thread ID and our DB conversation ID are missing to determine a new conversation
     if (!currentOpenAIThreadId && (currentConversationDbId === null || currentConversationDbId === undefined)) {
       console.log(`Chat API - User ${authenticatedUser.id}: Creating new OpenAI thread and DB conversation.`);
       const thread = await openai.beta.threads.create();
@@ -106,7 +97,6 @@ export default async function handler(
       currentConversationDbId = newConversation!.id;
       console.log(`Chat API - User ${authenticatedUser.id}: New DB conversation ID ${currentConversationDbId} linked to OpenAI Thread ${currentOpenAIThreadId}`);
     } else if (currentOpenAIThreadId && (typeof currentConversationDbId === 'number' || typeof currentConversationDbId === 'string')) {
-      // Existing conversation, update timestamp
       await supabaseAdmin
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
@@ -117,13 +107,11 @@ export default async function handler(
         return res.status(400).json({ error: "Inconsistent conversation state. Please start a new chat." });
     }
 
-    // 4. Add User Message to OpenAI Thread
     await openai.beta.threads.messages.create(currentOpenAIThreadId!, {
       role: 'user',
       content: userMessageContent,
     });
 
-    // 5. Save User Message to Supabase DB
     const { error: userMsgInsertError } = await supabaseAdmin.from('messages').insert([
       { conversation_id: currentConversationDbId, role: 'user', content: userMessageContent },
     ]);
@@ -131,12 +119,10 @@ export default async function handler(
         console.error('Chat API - DB Error saving user message:', userMsgInsertError.message);
     }
 
-    // 6. Create and Run Assistant
     let run = await openai.beta.threads.runs.create(currentOpenAIThreadId!, {
-      assistant_id: assistantId!, // <--- FIX APPLIED HERE: Non-null assertion
+      assistant_id: assistantId!,
     });
 
-    // 7. Poll for Run Completion & Handle Tool Calls
     const maxPollAttempts = 35;
     const pollInterval = 2000;
 
@@ -168,9 +154,11 @@ export default async function handler(
           }
           
           if (toolOutputs.length > 0) {
-            await openai.beta.threads.runs.submit_tool_outputs(currentOpenAIThreadId!, run.id, {
+            // --- FIX APPLIED HERE ---
+            await openai.beta.threads.runs.submitToolOutputs(currentOpenAIThreadId!, run.id, {
               tool_outputs: toolOutputs,
             });
+            // --- END OF FIX ---
           }
         }
       } else if (['failed', 'cancelled', 'expired'].includes(run.status)) {
@@ -184,17 +172,15 @@ export default async function handler(
       throw new Error('AI response timed out. Please try sending your message again.');
     }
 
-    // 8. Retrieve Assistant's Response
     const messagesResponse = await openai.beta.threads.messages.list(currentOpenAIThreadId!, { order: 'desc', limit: 1 });
     
     let assistantReply = "I'm not quite sure how to respond to that at the moment. Could you try rephrasing or asking something else?";
-    // @ts-ignore // OpenAI type for content can be complex array, this simplifies for text content
+    // @ts-ignore
     if (messagesResponse.data.length > 0 && messagesResponse.data[0].role === 'assistant' && messagesResponse.data[0].content[0]?.type === 'text') {
         // @ts-ignore
         assistantReply = messagesResponse.data[0].content[0].text.value;
     }
 
-    // 9. Save Assistant Message to Supabase DB
     const { error: assistantMsgInsertError } = await supabaseAdmin.from('messages').insert([
       { conversation_id: currentConversationDbId, role: 'assistant', content: assistantReply },
     ]);
@@ -202,12 +188,10 @@ export default async function handler(
         console.error('Chat API - DB Error saving assistant message:', assistantMsgInsertError.message);
     }
 
-    // 10. Send Response to Frontend
-    // Ensure the structure here matches your `ChatServiceResponse` type from `@/types`
     return res.status(200).json({
-      reply: assistantReply, // Or 'result' if that's what ChatServiceResponse expects
+      reply: assistantReply,
       openai_thread_id: currentOpenAIThreadId!,
-      conversation_db_id: currentConversationDbId!, // Ensure type (number/string) matches ChatServiceResponse
+      conversation_db_id: currentConversationDbId!,
       explanation: "Response from AI Companion."
     });
 
