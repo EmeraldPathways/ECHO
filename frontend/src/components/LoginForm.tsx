@@ -9,7 +9,8 @@ const LoginForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const { signInWithPassword, signUpWithPassword } = useAuth();
+  // Correctly destructure functions from useAuth as defined in AuthProvider
+  const { signIn, signUp } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -19,32 +20,24 @@ const LoginForm: React.FC = () => {
     setMessage(null);
 
     try {
-      let authResponse;
       if (isSignUp) {
-        authResponse = await signUpWithPassword({ email, password });
-        if (!authResponse.error && authResponse.user) {
-          setMessage('Sign up successful! Please check your email to verify your account if email confirmation is enabled. You are now logged in.');
-          // Supabase automatically signs in the user after successful sign-up
-          // The trigger in Supabase DB will create the user profile row.
-          // No need to redirect immediately if email verification is required,
-          // but for this example, we'll assume auto-login or redirect.
-          router.push('/'); // Redirect to home/chat page after signup
-        }
+        // Call signUp with individual arguments
+        await signUp(email, password);
+        setMessage('Sign up successful! Please check your email to verify your account if email confirmation is enabled. You are now being logged in.');
+        // Supabase/AuthProvider handles session update via onAuthStateChange.
+        // Redirect will happen after state update or can be forced here.
+        router.push('/'); // Redirect to home/chat page after signup
       } else {
-        authResponse = await signInWithPassword({ email, password });
-        if (!authResponse.error && authResponse.user) {
-          // Successful sign-in, AuthProvider will update user state and redirect
-          // No explicit redirect needed here as AuthProvider handles it via onAuthStateChange
-          // or the main page component will re-render.
-          router.push('/'); // Redirect to home/chat page
-        }
+        // Call signIn with individual arguments
+        await signIn(email, password);
+        // Successful sign-in, AuthProvider will update user state.
+        // setMessage('Sign in successful! Redirecting...'); // Optional message
+        router.push('/'); // Redirect to home/chat page
       }
-
-      if (authResponse.error) {
-        setError(authResponse.error.message);
-      }
+      // No explicit 'authResponse.error' or 'authResponse.user' to check here,
+      // as errors are thrown and success means AuthProvider handles state.
     } catch (err: any) {
-      console.error("Auth error:", err);
+      console.error("Auth error in LoginForm:", err);
       setError(err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
