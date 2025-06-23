@@ -25,21 +25,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
   };
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive, but instantly if user is already near bottom
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100; // If within 100px of bottom
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
       scrollToBottom(isNearBottom ? "smooth" : "auto");
     } else {
-      scrollToBottom("auto"); // Initial load
+      scrollToBottom("auto");
     }
   }, [messages]);
 
   useEffect(() => {
-    // When initial messages or thread ID change, update state
     if (initialConversationDbId !== null && initialConversationDbId !== undefined) {
-      // Only update state if loading a specific past conversation
-      // This prevents resetting state for new conversations that don't pass these props
       setMessages(initialMessages || []);
       setCurrentThreadId(initialOpenaiThreadId || null);
       setCurrentConversationDbId(initialConversationDbId);
@@ -50,15 +46,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
         setIsLoading(true);
         try {
           const fetchedMessages = await fetchConversationMessages(initialConversationDbId, session.access_token);
-          // Map fetched messages to the Message type expected by ChatWindow
           const formattedMessages: Message[] = fetchedMessages.map((msg: any) => ({
             id: msg.id.toString(),
             text: msg.content,
             sender: msg.role,
           }));
           setMessages(formattedMessages);
-          setCurrentThreadId(initialOpenaiThreadId || null); // Ensure thread ID is also set
-          setCurrentConversationDbId(initialConversationDbId); // Ensure conversation DB ID is set
+          setCurrentThreadId(initialOpenaiThreadId || null);
+          setCurrentConversationDbId(initialConversationDbId);
         } catch (error) {
           console.error("Failed to load conversation messages:", error);
           setMessages([{
@@ -75,15 +70,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
     if (initialConversationDbId && session?.access_token) {
       loadMessages();
     }
-  }, [initialOpenaiThreadId, initialConversationDbId, initialMessages, session?.access_token]); // Added initialMessages and session.access_token as a dependency
+  }, [initialOpenaiThreadId, initialConversationDbId, initialMessages, session?.access_token]);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
-    console.log("Inside handleSendMessage. Current session:", session);
-    console.log("Access token from session:", session?.access_token);
     if (!session?.access_token) {
       console.error("No access token available for sending message.");
-      return; // Prevent sending message if no token
+      return;
     }
 
     const newUserMessage: Message = {
@@ -95,24 +88,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
     setIsLoading(true);
 
     try {
-      // --- FIX APPLIED HERE ---
       const dbIdForApi = currentConversationDbId !== null ? String(currentConversationDbId) : null;
       const assistantResponse = await sendMessageToAssistant(text, currentThreadId, dbIdForApi, session.access_token);
-      // --- END OF FIX ---
 
-      if (assistantResponse.openai_thread_id) { // Use openai_thread_id from response
+      if (assistantResponse.openai_thread_id) {
         setCurrentThreadId(assistantResponse.openai_thread_id);
       }
-      if (assistantResponse.conversation_db_id) { // Use conversation_db_id from response
-        setCurrentConversationDbId(assistantResponse.conversation_db_id);
+
+      // --- FIX APPLIED HERE for conversation_db_id ---
+      const newConvDbIdFromApi = assistantResponse.conversation_db_id;
+
+      if (typeof newConvDbIdFromApi === 'string' && newConvDbIdFromApi.trim() !== '') {
+        const numId = parseInt(newConvDbIdFromApi, 10); // Parse string to number (base 10)
+        if (!isNaN(numId)) { // Check if parsing was successful
+          setCurrentConversationDbId(numId);
+        } else {
+          console.error("Invalid numeric string for conversation_db_id from API:", newConvDbIdFromApi);
+          setCurrentConversationDbId(null); // Fallback to null if parsing failed
+        }
+      } else if (typeof newConvDbIdFromApi === 'number') {
+        setCurrentConversationDbId(newConvDbIdFromApi);
+      } else if (newConvDbIdFromApi === null) {
+        setCurrentConversationDbId(null);
       }
+      // If newConvDbIdFromApi is undefined or an empty string, currentConversationDbId remains unchanged from this block.
+      // --- END OF FIX ---
 
       const newBotMessage: Message = {
-        id: (Date.now() + Math.random()).toString(), // Unique ID
-        text: assistantResponse.result, // Use result from response
+        id: (Date.now() + Math.random()).toString(),
+        text: assistantResponse.result,
         sender: "bot",
         model: "AI Companion",
-        explanation: assistantResponse.explanation || undefined, // Pass undefined if empty
+        explanation: assistantResponse.explanation || undefined,
       };
       setMessages((prevMessages) => [...prevMessages, newBotMessage]);
 
@@ -134,16 +141,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
 
   return (
     <div className="card w-full max-w-[600px] h-[calc(100vh-200px)] min-h-[500px] max-h-[700px] shadow-2xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-glow mx-auto border-2 border-primary/20">
-      {/* Chat Header */}
       <div className="bg-gradient-to-r from-primary to-secondary p-4 rounded-t-xl shadow-lg relative overflow-hidden flex-shrink-0">
-        {/* Header background decoration */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/5"></div>
         <div className="relative z-10 text-center">
           <img src="/icons/Echo Logo.png" alt="Echo Therapy Logo" className="h-10 w-auto mx-auto mb-0" />
           <p className="text-gray-500 text-sm">Navigating your thoughts with a caring AI companion</p>
         </div>
       </div>
-      {/* Messages Area */}
       <div
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto px-4 py-1 space-y-3 bg-gradient-to-b from-primary/5 to-white/95 custom-scrollbar"
@@ -160,9 +164,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
-        <div ref={messagesEndRef} className="h-1" /> {/* Scroll anchor */}
+        <div ref={messagesEndRef} className="h-1" />
       </div>
-      {/* Loading Indicator */}
       {isLoading && (
         <div className="px-4 py-3 bg-gradient-to-r from-primary/10 to-secondary/10 backdrop-blur-sm flex-shrink-0">
           <div className="flex items-center justify-center">
@@ -177,13 +180,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
           </div>
         </div>
       )}
-
-      {/* Message Input */}
       <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} />
-
-      {/* Disclaimer Footer */}
       <div className="bg-gradient-to-r from-primary to-secondary p-4 rounded-b-xl shadow-lg relative overflow-hidden flex-shrink-0">
-        {/* Footer background decoration */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/5"></div>
         <div className="relative z-10 text-center">
           <p className="text-gray-500 text-sm">DISCLAIMER: I am not a therapist & cannot provide medical advice or crisis support. If you are in crisis, contact emergency services or a <a href="https://findahelpline.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">crisis hotline</a>.</p>
