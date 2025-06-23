@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Removed StoredMessage as it's not used here and caused a previous error
 import type { ChatServiceResponse, ChatServiceRequest } from '@/types';
 import type { User } from '@supabase/supabase-js';
 
@@ -120,7 +121,7 @@ export default async function handler(
     }
 
     let run = await openai.beta.threads.runs.create(currentOpenAIThreadId!, {
-      assistant_id: assistantId!,
+      assistant_id: assistantId!, // Non-null assertion for assistantId
     });
 
     const maxPollAttempts = 35;
@@ -175,7 +176,7 @@ export default async function handler(
     const messagesResponse = await openai.beta.threads.messages.list(currentOpenAIThreadId!, { order: 'desc', limit: 1 });
     
     let assistantReply = "I'm not quite sure how to respond to that at the moment. Could you try rephrasing or asking something else?";
-    // @ts-ignore
+    // @ts-ignore // OpenAI type for content can be complex array, this simplifies for text content
     if (messagesResponse.data.length > 0 && messagesResponse.data[0].role === 'assistant' && messagesResponse.data[0].content[0]?.type === 'text') {
         // @ts-ignore
         assistantReply = messagesResponse.data[0].content[0].text.value;
@@ -188,10 +189,11 @@ export default async function handler(
         console.error('Chat API - DB Error saving assistant message:', assistantMsgInsertError.message);
     }
 
+    // Ensure the structure here matches your `ChatServiceResponse` type from `@/types`
     return res.status(200).json({
-      reply: assistantReply,
+      reply: assistantReply, // Or 'result' if that's what ChatServiceResponse expects
       openai_thread_id: currentOpenAIThreadId!,
-      conversation_db_id: currentConversationDbId!,
+      conversation_db_id: currentConversationDbId!, // Ensure type (number/string) matches ChatServiceResponse
       explanation: "Response from AI Companion."
     });
 
