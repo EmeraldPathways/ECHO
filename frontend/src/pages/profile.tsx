@@ -93,7 +93,11 @@ const ProfilePage: React.FC = () => {
         <title>Your Profile | AI Companion</title>
         <meta name="description" content="Manage your AI Companion profile." />
       </Head>
-      <div className="min-h-screen flex flex-col items-center bg-gray-100 pt-16">
+      <div className="min-h-screen flex flex-col items-center bg-secondary-50 relative overflow-hidden pt-24">
+        {/* Decorative background elements */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,255,255,0.12)_0%,_transparent_60%)] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(255,255,255,0.1)_0%,_transparent_70%)] pointer-events-none"></div>
+
         {/* Navigation Bar (same as index.tsx) */}
         <NavBar />
 
