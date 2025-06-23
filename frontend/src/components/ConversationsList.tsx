@@ -1,97 +1,109 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from './AuthProvider';
-import { fetchUserConversations } from '@/services/api'; // Ensure this path is correct
-import type { Conversation } from '@/types'; // Your Conversation type
-import Link from 'next/link'; // For navigation
-import { useRouter } from 'next/router';
+import React from 'react';
 
-interface ConversationsListProps {
-  // Callback to select a conversation and load it in the ChatWindow
-  // This implies ChatWindow needs to be able to accept conversationId and messages as props
-  onSelectConversation: (conversationId: number, openaiThreadId: string | null | undefined, title: string | null | undefined) => void;
+// Define a basic Conversation type based on the usage in the error log
+// You should adjust this to match your actual Conversation type in `../types` or wherever it's defined
+interface Conversation {
+  id: string; // The error indicates this is a string
+  openai_thread_id: string | null;
+  title: string;
+  // Add any other properties your Conversation object has, e.g., last_message_preview, timestamp
+  last_message_preview?: string;
+  updated_at?: string; // Or Date
 }
 
-const ConversationsList: React.FC<ConversationsListProps> = ({ onSelectConversation }) => {
-  const { user, session } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+interface ConversationsListProps {
+  conversations: Conversation[];
+  onSelectConversation: (
+    dbId: number, // The error indicates this parameter is expected to be a number
+    openaiThreadId: string | null,
+    title: string
+  ) => void;
+  currentConversationDbId?: number | null; // Optional: to highlight the active conversation
+}
 
-  useEffect(() => {
-    const loadConversations = async () => {
-      if (!user || !session?.access_token) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const fetchedConversations = await fetchUserConversations(session.access_token);
-        setConversations(fetchedConversations || []);
-      } catch (err: any) {
-        console.error("Error fetching conversations:", err);
-        setError(err.message || 'Failed to load conversations.');
-      } finally {
-        setLoading(false);
-      }
-    };
+const ConversationsList: React.FC<ConversationsListProps> = ({
+  conversations,
+  onSelectConversation,
+  currentConversationDbId,
+}) => {
+  if (!conversations || conversations.length === 0) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        No conversations yet. Start a new chat!
+      </div>
+    );
+  }
 
-    loadConversations();
-  }, [user, session]);
+  const handleSelectConversation = (conversation: Conversation) => {
+    // This is where the error occurred (line 53 in your log)
+    // We need to parse conversation.id from string to number
 
-  const handleConversationClick = (conversation: Conversation) => {
-    // Instead of navigating to a new page for each chat,
-    // we can call back to the parent (e.g., a main layout or index page)
-    // to update the ChatWindow with this conversation's details.
-    // This requires the parent component to manage which conversation is active.
-    // For now, let's assume onSelectConversation will handle loading it into the main chat view.
-    
-    // If you want to navigate to the main chat page and pass query params:
-    // router.push(`/?conversationId=${conversation.id}&threadId=${conversation.openai_thread_id}`);
-    // However, a callback is cleaner for SPA-like behavior within the same page structure.
-    onSelectConversation(conversation.id, conversation.openai_thread_id, conversation.title);
+    // --- FIX APPLIED HERE ---
+    const conversationDbIdAsNumber = parseInt(conversation.id, 10);
+
+    if (isNaN(conversationDbIdAsNumber)) {
+      console.error(
+        `Invalid conversation ID: ${conversation.id}. Could not parse to number.`
+      );
+      // Optionally, you could show an error to the user or skip selection
+      return;
+    }
+    // --- END OF FIX ---
+
+    // Now, call onSelectConversation with the parsed number
+    onSelectConversation(
+      conversationDbIdAsNumber,
+      conversation.openai_thread_id,
+      conversation.title
+    );
   };
 
-
-  if (loading) {
-    return <div className="text-center p-4 text-gray-600">Loading conversations...</div>;
-  }
-
-  if (error) {
-    return <div className="text-center p-4 text-red-600">Error: {error}</div>;
-  }
-
-  if (conversations.length === 0) {
-    return <div className="text-center p-4 text-gray-500">You have no saved conversations yet.</div>;
-  }
-
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
-      <ul className="divide-y divide-gray-200">
-        {conversations.map((convo) => (
-          <li key={convo.id} className="py-2">
-            <button
-              onClick={() => handleConversationClick(convo)}
-              className="w-full text-left p-3 rounded-md hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition-colors"
-              aria-label={`Open conversation titled ${convo.title || 'Untitled Conversation'}`}
-            >
-              <div className="flex justify-between items-center">
-                <h3 className="text-md font-semibold text-blue-600 truncate">
-                  {convo.title || 'Untitled Conversation'}
-                </h3>
-                <span className="text-xs text-gray-500">
-                  {convo.updated_at ? new Date(convo.updated_at).toLocaleDateString() : 'N/A'}
-                </span>
-              </div>
-              {/* Optionally, display a snippet of the last message if you fetch it */}
-              {/* <p className="text-sm text-gray-600 mt-1 truncate">
-                {convo.messages && convo.messages.length > 0 ? convo.messages[0].content : 'No messages yet...'}
-              </p> */}
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div className="bg-gradient-to-br from-primary/10 to-secondary/10 shadow-lg rounded-xl p-3 space-y-2 custom-scrollbar overflow-y-auto h-full">
+      <h2 className="text-xl font-semibold mb-3 text-gradient px-2">
+        Past Conversations
+      </h2>
+      {conversations.map((conversation) => {
+        // Attempt to parse conversation.id to number for comparison with currentConversationDbId
+        const conversationIdForComparison = parseInt(conversation.id, 10);
+        const isActive = !isNaN(conversationIdForComparison) && conversationIdForComparison === currentConversationDbId;
+
+        return (
+          <button
+            key={conversation.id}
+            onClick={() => handleSelectConversation(conversation)}
+            className={`
+              w-full text-left p-3 rounded-lg transition-all duration-200 ease-in-out
+              focus:outline-none focus:ring-2 focus:ring-opacity-50
+              ${
+                isActive
+                  ? 'bg-primary/80 text-white shadow-md transform scale-[1.02]'
+                  : 'bg-white/70 hover:bg-primary/20 text-gray-700 hover:text-primary-dark shadow-sm hover:shadow-md'
+              }
+              dark:bg-gray-700/70 dark:hover:bg-primary-dark/50 dark:text-gray-300 dark:hover:text-white
+              dark:focus:ring-primary-light
+              ${isActive ? 'dark:bg-primary-dark dark:text-white' : ''}
+            `}
+            title={`Select conversation: ${conversation.title}`}
+          >
+            <h3 className="font-semibold text-sm truncate">
+              {conversation.title || 'Untitled Conversation'}
+            </h3>
+            {conversation.last_message_preview && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {conversation.last_message_preview}
+              </p>
+            )}
+            {conversation.updated_at && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                <small>
+                  {new Date(conversation.updated_at).toLocaleDateString()} - {new Date(conversation.updated_at).toLocaleTimeString()}
+                </small>
+              </p>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 };
