@@ -75,7 +75,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
     if (initialConversationDbId && session?.access_token) {
       loadMessages();
     }
-  }, [initialOpenaiThreadId, initialConversationDbId, session?.access_token]); // Added session.access_token as a dependency
+  }, [initialOpenaiThreadId, initialConversationDbId, initialMessages, session?.access_token]); // Added initialMessages and session.access_token as a dependency
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -95,7 +95,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
     setIsLoading(true);
 
     try {
-      const assistantResponse = await sendMessageToAssistant(text, currentThreadId, currentConversationDbId, session.access_token);
+      // --- FIX APPLIED HERE ---
+      const dbIdForApi = currentConversationDbId !== null ? String(currentConversationDbId) : null;
+      const assistantResponse = await sendMessageToAssistant(text, currentThreadId, dbIdForApi, session.access_token);
+      // --- END OF FIX ---
 
       if (assistantResponse.openai_thread_id) { // Use openai_thread_id from response
         setCurrentThreadId(assistantResponse.openai_thread_id);
@@ -141,7 +144,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
         </div>
       </div>
       {/* Messages Area */}
-      <div 
+      <div
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto px-4 py-1 space-y-3 bg-gradient-to-b from-primary/5 to-white/95 custom-scrollbar"
       >
@@ -174,10 +177,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ initialConversationDbId, initia
           </div>
         </div>
       )}
-      
+
       {/* Message Input */}
       <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} />
-      
+
       {/* Disclaimer Footer */}
       <div className="bg-gradient-to-r from-primary to-secondary p-4 rounded-b-xl shadow-lg relative overflow-hidden flex-shrink-0">
         {/* Footer background decoration */}
