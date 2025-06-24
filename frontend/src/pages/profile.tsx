@@ -1,11 +1,10 @@
-```typescript
 // src/pages/profile.tsx (NEW DYNAMIC WRAPPER)
 import dynamic from 'next/dynamic';
 import React from 'react';
 
 // Dynamically import the actual profile page content, disabling SSR
 const ProfilePageContent = dynamic(
-  () => import('@/components/ProfilePageContent'), // Adjust path if you named it differently
+  () => import('@/components/ProfilePageContent'), // Ensure this path is correct
   { ssr: false } // This is the crucial part
 );
 
@@ -16,5 +15,3 @@ const ProfilePageContainer: React.FC = () => {
 };
 
 export default ProfilePageContainer;
-```
-*   Commit this new file (e.g., "Feat: Add dynamic wrapper for profile page").
