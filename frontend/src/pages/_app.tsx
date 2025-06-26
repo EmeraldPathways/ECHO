@@ -1,11 +1,9 @@
-import { AuthProvider } from '@/components/AuthProvider'
-import '@/styles/globals.css';
+// TEMPORARY MINIMAL TEST CONTENT for src/pages/_app.tsx
+import '@/styles/globals.css'; // Keep global styles
 import type { AppProps } from 'next/app';
 
-export default function App({ Component, pageProps }: AppProps) {
-  return (
-    <AuthProvider>
-      <Component {...pageProps} />
-    </AuthProvider>
-  );
+function MyApp({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />;
 }
+
+export default MyApp;
