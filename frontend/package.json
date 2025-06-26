@@ -1,7 +1,7 @@
 "dependencies": {
   "@types/react": "latest",
   "typescript": "latest"
-}
+},
 "devDependencies": {
   "@types/node": "latest",
   "@types/react-dom": "latest",
