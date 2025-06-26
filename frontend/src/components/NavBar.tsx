@@ -1,18 +1,11 @@
-// TEMPORARY MINIMAL TEST CONTENT for src/components/NavBar.tsx
+// EXTREMELY MINIMAL NavBar.tsx for testing
 import React from 'react';
-import Link from 'next/link';
 
 const NavBar: React.FC = () => {
   return (
-    <nav style={{ padding: '1rem', background: '#eee', borderBottom: '1px solid #ccc' }}>
-      <Link href="/" style={{ marginRight: '1rem' }}>
-        Minimal Home
-      </Link>
-      <Link href="/contact" style={{ marginRight: '1rem' }}>
-        Minimal Contact
-      </Link>
-      <span>Minimal NavBar Test</span>
-    </nav>
+    <div style={{ height: '50px', background: 'lightcoral', textAlign: 'center', color: 'white' }}>
+      MINIMAL NAV BAR TEST - NO LINKS, NO HOOKS
+    </div>
   );
 };
 
