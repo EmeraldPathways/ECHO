@@ -14,7 +14,7 @@
     "react-dom": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
     "@supabase/supabase-js": "latest",
-    "openai": "latest"
+    "openai": "latest",
     "next-pwa": "latest"
   },
   "devDependencies": {
