@@ -1,14 +1,21 @@
-// src/pages/contact.tsx
-import dynamic from 'next/dynamic';
+// TEMPORARY MINIMAL STATIC PAGE for src/pages/contact.tsx
 import React from 'react';
+import Head from 'next/head';
 
-const ContactContent = dynamic(
-  () => import('@/components/ContactPageContent'), // This path should be correct
-  { ssr: false } // This disables server-side rendering for the component
-);
+// NO NavBar, NO dynamic import, NO complex components
 
-const ContactContainer: React.FC = () => {
-  return <ContactContent />;
+const MinimalContactPage: React.FC = () => {
+  return (
+    <>
+      <Head>
+        <title>Contact Test</title>
+      </Head>
+      <div>
+        <h1>Minimal Contact Page</h1>
+        <p>This is a test to see if the build passes for /contact.</p>
+      </div>
+    </>
+  );
 };
 
-export default ContactContainer;
+export default MinimalContactPage;
