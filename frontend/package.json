@@ -1,13 +1,30 @@
-"dependencies": {
-  "@types/react": "latest",
-  "typescript": "latest"
-},
-"devDependencies": {
-  "@types/node": "latest",
-  "@types/react-dom": "latest",
-  "autoprefixer": "latest",
-  "eslint": "latest",
-  "eslint-config-next": "latest",
-  "postcss": "latest",
-  "tailwindcss": "latest"
+{
+  "name": "mental-health-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@supabase/auth-helpers-nextjs": "latest",
+    "@supabase/supabase-js": "latest",
+    "openai": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "autoprefixer": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest"
+  }
 }
